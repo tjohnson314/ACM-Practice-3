@@ -1,0 +1,195 @@
+
+import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.PriorityQueue;
+
+public class Main
+{
+
+	public static void main(String[] args)
+	{
+		Scanner sc = new Scanner(System.in);
+		int n = sc.nextInt();
+		int[] nums = new int[n];
+		int[] costs = new int[n];
+		
+		for(int i = 0; i < n; i++)
+			nums[i] = sc.nextInt();
+		
+		for(int i = 0; i < n; i++)
+			costs[i] = sc.nextInt();
+		sc.close();
+
+		boolean possible = CheckPossible(nums);
+		if(!possible)
+			System.out.println(-1);
+		else
+		{
+			//We try choosing each number. It will have at most 9 distinct prime factors.
+			//Then we see what numbers need to be chosen to cancel out each of these factors.
+			int bestCost = -1;
+			
+			for(int i = 0; i < n; i++)
+			{
+				//System.out.println("Choosing number: " + Integer.toString(nums[i]));
+				
+				ArrayList<Integer> primes = distinctFactors(nums[i]);
+				int numPrimes = primes.size();
+				if(numPrimes > 9)
+					System.out.println("Error: Too many distinct prime factors!");
+				
+				//System.out.println("The number of primes is: " + numPrimes);
+				
+				//We now make an array with our options for canceling out each subset of factors.
+				//We only use numbers that come after our current one, since we have already decided
+				//at this point not to include previous numbers.
+				int numSubsets = (int)Math.pow(2, numPrimes);
+				int[] subsetCosts = new int[numSubsets];
+				
+				for(int j = 0; j < numSubsets; j++)
+					subsetCosts[j] = -1;
+				
+				for(int j = i + 1; j < n; j++)
+				{
+					int currNum = nums[j];
+					int currIndex = 0;
+					for(int k = 0; k < numPrimes; k++)
+					{
+						int currPrime = primes.get(k);
+						if(currNum%currPrime != 0)
+						{
+							//We can cancel out the kth prime by choosing this number.
+							//So we put a 1 in the kth most significant bit.
+							currIndex |= 1 << k; 
+						}
+					}
+					
+					if(subsetCosts[currIndex] < 0 || subsetCosts[currIndex] > costs[j])
+						subsetCosts[currIndex] = costs[j];
+				}
+				
+				//We now have the best possible cost for canceling every subset of factors. So we need
+				//to figure out how to choose a set of them that will cancel every prime.
+				
+				//We do this by looking at the graph defined implicitly on our subsets, where the edges
+				//represent adding a new number. We run Dijkstra's algorithm to find the shortest distance
+				//from subset 0 (nothing canceled) to the last subset (everything canceled).
+				
+				int currCost = getCost(numSubsets, subsetCosts);
+				if(currCost >= 0)
+				{
+					//We have to remember to also add the cost of the first number we choose.
+					currCost += costs[i];
+					if(bestCost < 0 || currCost < bestCost)
+						bestCost = currCost;
+				}
+				else break; //There is no solution after this point.
+			}
+			
+			System.out.println(bestCost);
+		}
+	}
+
+	//We check that the GCD of all of our lengths is 1.
+	public static boolean CheckPossible(int[] nums)
+	{
+		int totalGCD = nums[0];
+		for(int i = 1; i < nums.length; i++)
+			totalGCD = gcd(totalGCD, nums[i]);
+		
+		return(totalGCD == 1);
+	}
+	
+	public static int gcd(int a, int b)
+	{
+		if(b == 0)
+			return a;
+		else
+			return gcd(b, a%b);
+	}
+	
+	public static ArrayList<Integer> distinctFactors(int num)
+	{
+		ArrayList<Integer> factors = new ArrayList<Integer>();
+		
+		for(int i = 2; num > 1; i++)
+		{
+			if(num%i == 0)
+			{
+				factors.add(i);
+				while(num%i == 0)
+					num /= i;
+			}
+		}
+		
+		return factors;
+	}
+	
+	public static int getCost(int numSubsets, int[] subsetCosts)
+	{
+		int[] distance = new int[numSubsets];
+		boolean[] reached = new boolean[numSubsets];
+		PriorityQueue<KeyValPair> queue = new PriorityQueue<KeyValPair>();
+		ArrayList<KeyValPair> edges = new ArrayList<KeyValPair>();
+		
+		for(int i = 0; i < numSubsets; i++)
+		{
+			distance[i] = -1;
+			reached[i] = false;
+			if(subsetCosts[i] >= 0)
+				edges.add(new KeyValPair(i, subsetCosts[i]));
+		}
+		
+		queue.add(new KeyValPair(0, 0));
+		distance[0] = 0;
+		reached[0] = true;
+		
+		while(!queue.isEmpty())
+		{
+			//We look at all the edges defined by our subsets.
+			KeyValPair nextNum = queue.poll();
+			reached[nextNum.key] = true;
+			
+			//If we have reached the end, we are done.
+			if(nextNum.key == numSubsets - 1)
+			{
+				//System.out.println("The cost of covering the given primes is: " + Integer.toString(nextNum.val) + "\n");
+				return nextNum.val;
+			}
+			
+			//Otherwise, we explore all of the connected vertices that have not been reached.
+			for(int j = 1; j < numSubsets; j++)
+			{
+				//We get the next vertex by adding all of the values that are not yet covered.
+				if(subsetCosts[j] >= 0)
+				{
+					int newNum = nextNum.key | j;
+					int newCost = nextNum.val + subsetCosts[j];
+					
+					if(!reached[newNum])
+						queue.add(new KeyValPair(newNum, newCost));
+				}
+			}
+		}
+		
+		//System.out.println("There is no solution after this point.\n");
+		return -1;
+	}
+	
+	static class KeyValPair implements Comparable<KeyValPair>
+	{
+		int key;
+		int val;
+		
+		public KeyValPair(int p, int q)
+		{
+			key = p;
+			val = q;
+		}
+		
+		public int compareTo(KeyValPair otherPair)
+		{
+			return ((Integer)val).compareTo(otherPair.val);
+		}
+	}
+}

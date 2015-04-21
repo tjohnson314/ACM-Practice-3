@@ -1,0 +1,121 @@
+
+import java.util.Scanner;
+import java.util.Collections;
+import java.util.ArrayList;
+
+public class Main
+{
+
+	public static void main(String[] args)
+	{
+		Scanner sc = new Scanner(System.in);
+		int n = sc.nextInt();
+		ArrayList<Person> friends = new ArrayList<Person>();
+		int maxHeight = -1;
+		
+		for(int i = 0; i < n; i++)
+		{
+			int width = sc.nextInt();
+			int height = sc.nextInt();
+			friends.add(new Person(width, height));
+			
+			//We compute the maximum height along the way, which we are given is at most 1000.
+			if(height > maxHeight)
+				maxHeight = height;
+			
+			if(width > maxHeight)
+				maxHeight = width; //This person might lie down, so we need to check their width as well.
+		}
+		sc.close();
+		
+		//We sort out list of people by how much they can decrease the width by lying down.
+		//Then we loop over all of the possible heights. We choose people to lie down who can
+		//improve the width without exceeding the maximum height or the limit of n/2 people
+		//lying down.
+		
+		Collections.sort(friends);
+		int bestArea = -1;
+		for(int currHeight = 1; currHeight <= maxHeight; currHeight++)
+		{
+			int totalWidth = 0;
+			boolean valid = true;
+			int flipCount = 0;
+			boolean[] flipped = new boolean[n];
+			
+			//We first check that it is possible to flip people so that
+			//the given height is achievable.
+			for(int i = 0; i < n; i++)
+			{
+				Person next = friends.get(i);
+				if(next.height > currHeight)
+				{
+					if(next.width > currHeight)
+					{
+						//This person does not fit either horizontally or vertically.
+						valid = false;
+					}
+					else
+					{
+						//We have to make this person lie down.
+						flipped[i] = true;
+						flipCount++;
+						if(flipCount > n/2)
+							valid = false; //We can't make this many people lie down.
+					}
+				}
+				else
+					flipped[i] = false; //This person does not have to lie down, but may be able to later.
+			}
+			
+			if(valid)
+			{
+				for(int i = 0; i < n; i++)
+				{
+					Person next = friends.get(i);
+					if(flipped[i])
+					{
+						//We already know that this person has to lie down.
+						totalWidth += next.height;
+						System.out.println("Lying down: " + Integer.toString(next.width) + ", " + Integer.toString(next.height));
+					}
+					else if(flipCount < n/2 && next.width < next.height)
+					{
+						//We can have this person also lie down.
+						totalWidth += next.height;
+						flipCount++;
+						System.out.println("Lying down: " + Integer.toString(next.width) + ", " + Integer.toString(next.height));
+					}
+					else
+					{
+						//This person will stand up.
+						totalWidth += next.width;
+						System.out.println("Standing up: " + Integer.toString(next.width) + ", " + Integer.toString(next.height));
+					}
+				}
+				
+				int currArea = totalWidth*currHeight;
+				System.out.println(currArea);
+				if(bestArea < 0 || currArea < bestArea)
+					bestArea = currArea; //Use this arrangement if it is the best seen so far.
+			}
+		}
+		System.out.println(bestArea);
+	}
+
+	static class Person implements Comparable<Person>
+	{
+		int width;
+		int height;
+		
+		public Person(int w, int h)
+		{
+			width = w;
+			height = h;
+		}
+		
+		public int compareTo(Person other)
+		{
+			return ((Integer) (width - height)).compareTo((Integer) (other.width - other.height));
+		}
+	}
+}
